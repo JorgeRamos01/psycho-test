@@ -1,0 +1,148 @@
+---
+title: "Knotion Rasch"
+author: "Jorge Luis Ramos Zavaleta"
+date: "4 de julio de 2019"
+output: pdf_document
+---
+
+## Calcular dificultad y discriminación para preguntas del 2018
+
+En el modelo de Rasch dicotómico la discriminación siempre toma el valor de 1 (puede consultarse <https://www.rasch.org/rmt/rmt181b.htm> ) y la discriminación esta representada en el modelo básico IRT por $\alpha$ y la dificultad por $\beta$ (<http://web.pdx.edu/~newsomj/cdaclass/ho_irt.pdf>). 
+```{r message=FALSE, warning=FALSE, include=FALSE}
+rm(list=ls())
+setwd("D:/psycho-test-master/data/raw")
+library(readr)
+library(tidyr)
+library(dplyr)
+library(TAM)
+library(knitr)
+library(kableExtra)
+test_data <- read_csv("test_data.csv")
+```
+Para calcular $\alpha$ y $\beta$, primero filtramos los datos del año 2018 para usarlos y ponemos los datos en el formato que requerimos usar como entrada para el modelo de Rasch
+```{r echo=TRUE}
+data_tam<-test_data %>% filter(year==2018) %>% spread(key=idQuestion, value=isCorrect)
+```
+Después generamos el modelo de Rasch y obtenemos los valores de discriminación ($\alpha$) y de dificultad ($\beta$) de cada pregunta, y los colocamos en un dataframe
+```{r include=FALSE}
+#Generamos el modelo Rasch
+modeloRasch<-data_tam %>% select(-one_of("year", "campusName", "idUser_int")) %>% tam()
+
+#Extraemos las dificultades y discriminaciones de cada pregunta
+pregunta<-modeloRasch$item_irt$item
+dificultad<-modeloRasch$item_irt$beta
+discriminacion<-modeloRasch$item_irt$alpha
+incisoUno<-data.frame(pregunta, dificultad, discriminacion)
+```
+```{r}
+kable(incisoUno, booktabs = T) %>% kable_styling(position = "center")
+```
+
+Cabe observarse que los valores de discriminación son todos 1 como se esperaba.
+
+## Ranking de escuelas para 2018
+
+Para el cálculo del ranking se obtuvo el nivel de habilidad por alumno para cada escuela. Para establecer el ranking se proponen dos indicadores. El primero $$Ranking_1 = \frac{Numero \ de \ estudiantes \ con \ habilidad \ mayor \ que \ cero}{Total \ de \ estudiantes \ que presentaron \ el \ examen \ en \ esta \ escuela}$$ Este ranking nos permite conocer la proporción de estudiantes con una habilidad promedio del total muestreado. El segundo indicador es $$Ranking_2 = \frac{Suma \ de \ las \ habilidades \ mayores \ que \ cero}{Numero \ de \ estudiantes \ con \ habilidad \ mayor \ que \ cero}$$ Este ranking nos permite diferenciar si existe un mayor nivel de habilidad en una escuela o en otra considerando solo los casos que presentaron habilidad positiva.
+
+```{r include=FALSE}
+campusA<-test_data %>% filter(year==2018 & campusName=="Campus A") %>% spread(key=idQuestion, value=isCorrect) %>% select(-one_of("year", "campusName", "idUser_int")) %>% tam()
+campusB<-test_data %>% filter(year==2018  & campusName=="Campus B") %>% spread(key=idQuestion, value=isCorrect) %>% select(-one_of("year", "campusName", "idUser_int")) %>% tam()
+campusC<-test_data %>% filter(year==2018 & campusName=="Campus C") %>% spread(key=idQuestion, value=isCorrect) %>% select(-one_of("year", "campusName", "idUser_int")) %>% tam()
+
+#Extraemos
+thetaA<-tam.wle(campusA)$theta
+thetaB<-tam.wle(campusB)$theta
+thetaC<-tam.wle(campusC)$theta
+
+#Generando el ranking
+ranking<-function(habilidad){
+  temp<-sum(habilidad[habilidad>0])/length(habilidad)
+  temp
+}
+
+ranking2<-function(habilidad){
+  temp<-sum(habilidad>0)/sum(habilidad[habilidad>0])
+  temp
+}
+
+ranks2018<-data.frame(c(ranking(thetaA), ranking(thetaB), ranking(thetaC)),
+                      c(ranking2(thetaA), ranking2(thetaB), ranking2(thetaC)))
+colnames(ranks2018)<-c("Ranking 1", "Ranking 2")
+```
+
+```{r}
+kable(ranks2018, booktabs = T) %>% kable_styling(position = "center")
+```
+
+De acuerdo a los resultados de ambos rankings hay un empate en primer lugar entre el Campus A y el Campus C, mientras que el Campus B ocuparia el segundo lugar.
+
+## Ranking de alumnos por escuela para 2018
+Para este ranking solo basta calcular las habilidades para cada alumno por escuela y ordenamos por nivel de habilidad para establecer el ranking, siendo el valor positivo mas alto el que mejor posicionado se encuentre en el ranking.
+```{r include=FALSE}
+idUsuarioA<-data_tam %>% filter(campusName=="Campus A") %>% select(idUser_int) %>% c()
+idUsuarioB<-data_tam %>% filter(campusName=="Campus B") %>% select(idUser_int) %>% c()
+idUsuarioC<-data_tam %>% filter(campusName=="Campus C") %>% select(idUser_int) %>% c()
+
+#Generamos el modelo de habilidades considerando el identificador de cada alumno
+thetaA2<-tam.wle(campusA, pid=idUsuarioA)
+thetaB2<-tam.wle(campusB, pid=idUsuarioB)
+thetaC2<-tam.wle(campusC, pid=idUsuarioC)
+
+campusA2018<-data.frame(thetaA2$idUser_int, thetaA2$theta) %>% arrange(desc(thetaA2$theta))
+campusB2018<-data.frame(thetaB2$idUser_int, thetaB2$theta) %>% arrange(desc(thetaB2$theta))
+campusC2018<-data.frame(thetaC2$idUser_int, thetaC2$theta) %>% arrange(desc(thetaC2$theta))
+```
+Para el campus A se tienen los siguientes resultados
+```{r}
+#De manera similar se pueden obtener los rankings para las otras dos escuelas, 
+#no se ponen en el documento para no ocupar tanto espacio.
+
+kable(campusA2018, col.names = c("idUsuario", "Habilidad"),
+      booktabs = T) %>% kable_styling(position = "center")
+
+```
+
+## Comparación 2018-2019
+Ya con los resultados para 2018 de nivel de habilidad se procede a calcular los de 2019 para observar si se genero algún cambio en los niveles de habilidad.
+
+```{r include=FALSE}
+#Generamos el modelo para todas las escuelas en 2019
+data_tam2019<-test_data %>% filter(year==2019) %>% spread(key=idQuestion, value=isCorrect)
+modeloRasch2019<-data_tam %>% select(-one_of("year", "campusName", "idUser_int")) %>% tam()
+
+#Calculamos los niveles de habilidad para ambos años
+theta2019<-tam.wle(modeloRasch2019)$theta
+theta2018<-tam.wle(modeloRasch)$theta
+```
+
+```{r}
+ranks<-data.frame(c("2018", "2019"),c(ranking(theta2018), ranking(theta2019)), 
+                  c(ranking2(theta2018), ranking2(theta2019)) )
+colnames(ranks)<-c("Año", "Ranking 1", "Ranking 2")
+kable(ranks,booktabs=T) %>% kable_styling(position = "center")
+```
+De acuerdo con estos resultados considerando toda la actividad escolar no parece haber cambio de un año a otro en el nivel de habilidad considerando toda la actividad escolar.
+
+Considerando cada escuela en particular se tienen los siguientes resultados
+
+```{r include=FALSE}
+#Generamos los modelos para cada escuela en 2019
+campusA2019<-test_data %>% filter(year==2019 & campusName=="Campus A") %>% spread(key=idQuestion, value=isCorrect) %>% select(-one_of("year", "campusName", "idUser_int")) %>% tam()
+campusB2019<-test_data %>% filter(year==2019  & campusName=="Campus B") %>% spread(key=idQuestion, value=isCorrect) %>% select(-one_of("year", "campusName", "idUser_int")) %>% tam()
+campusC2019<-test_data %>% filter(year==2019 & campusName=="Campus C") %>% spread(key=idQuestion, value=isCorrect) %>% select(-one_of("year", "campusName", "idUser_int")) %>% tam()
+
+thetaA2019<-tam.wle(campusA2019)$theta
+thetaB2019<-tam.wle(campusB2019)$theta
+thetaC2019<-tam.wle(campusC2019)$theta
+
+ranks2019<-data.frame(c(ranking(thetaA2019), ranking(thetaB2019), ranking(thetaC2019)),
+                      c(ranking2(thetaA2019), ranking2(thetaB2019), ranking2(thetaC2019)))
+colnames(ranks2019)<-c("Ranking 1", "Ranking 2")
+
+comparativoYear<-data.frame(c("Campus A","Campus B", "Campus C"), ranks2018, ranks2019)
+colnames(comparativoYear)<-c("Escuela", "Ranking 1: 2018", "Ranking 2: 2018", "Ranking 1: 2019", "Ranking 2: 2019")
+```
+```{r}
+kable(comparativoYear, booktabs=T) %>% kable_styling(position = "center")
+```
+De acuerdo a los resultados obtenidos en los rankings para los distintos campus, el campus B aumentó tanto en el numero de estudiantes con habilidad positiva como en los niveles de actividad de los estudiantes con habilidad positiva. Tanto en el campus A como el C disminuyó la proporción de estudiantes con habilidad positiva aunque en ambas el nivel de habilidad aumentó entre los estudiantes con habilidad positiva.
