@@ -1,14 +1,4 @@
-# psycho-test
 
-Estamos buscando a un(a) científico(a) que pueda procesar y analizar datos de evaluaciones de miles de niños de forma semi-automática, ordenada y reproducible, utilizando MySQL, R y RMarkdown. En particular, modelamos la habilidad de los niños usando modelos Rasch y el paquete TAM de R.
-
-Lecturas básicas recomendadas:
-
-* https://swcarpentry.github.io/r-novice-gapminder/02-project-intro/ para crear proyectos en R reproducibles y autocontenidos.
-
-* https://swcarpentry.github.io/git-novice/14-supplemental-rstudio/ para utilizar git.
-
-* https://en.wikipedia.org/wiki/Rasch_model sobre el modelo Rasch
 
 
 ## Problema
